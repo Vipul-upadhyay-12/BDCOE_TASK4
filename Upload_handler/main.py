@@ -49,7 +49,7 @@ async def upload_video(file: UploadFile = File(...)):
         """
         
         completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant", # <--- Updated model name
+            model="gemma2-9b-it", # <--- Completely free model
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0.3,
