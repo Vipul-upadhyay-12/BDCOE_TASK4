@@ -4,29 +4,32 @@ from moviepy import VideoFileClip
 import shutil
 import os
 import json
+import time
 
 app = FastAPI()
 
 # Initialize the Groq client
-# It automatically looks for an environment variable named GROQ_API_KEY
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 @app.post("/upload-video")
 async def upload_video(file: UploadFile = File(...)):
+    # 1. Start the stopwatch
+    start_time = time.time()
+    
     video_path = f"temp_{file.filename}"
     audio_path = "temp_audio.mp3"
     
     try:
-        # 1. Save the incoming video temporarily
+        # Save the incoming video temporarily
         with open(video_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        # 2. Extract the audio using MoviePy
+        # Extract the audio using MoviePy
         video = VideoFileClip(video_path)
         video.audio.write_audiofile(audio_path, logger=None)
         video.close()
         
-        # 3. Transcribe the audio using Groq (Whisper-large-v3)
+        # Transcribe the audio using Groq (Whisper-large-v3)
         with open(audio_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(
                 file=(audio_path, audio_file.read()),
@@ -35,8 +38,7 @@ async def upload_video(file: UploadFile = File(...)):
             )
         transcript_text = transcription.text
         
-        # 4. Generate the Quiz and Notes using Groq (Llama 3)
-        # We enforce JSON output so your frontend can easily parse it
+        # Generate the Quiz and Notes using Groq (Llama 3)
         prompt = f"""
         Based on the following transcript, generate study notes and a multiple-choice quiz.
         You must return ONLY a JSON object with exactly two keys:
@@ -47,7 +49,7 @@ async def upload_video(file: UploadFile = File(...)):
         """
         
         completion = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant", # <--- Updated model name
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0.3,
@@ -56,15 +58,20 @@ async def upload_video(file: UploadFile = File(...)):
         # Parse the JSON string from Groq into a Python dictionary
         result_data = json.loads(completion.choices[0].message.content)
         
-        # 5. Clean up the temporary files so the server doesn't run out of storage
+        # Clean up the temporary files
         os.remove(video_path)
         os.remove(audio_path)
         
-        # Return the final JSON to the user!
+        # 2. Stop the stopwatch and calculate total time
+        end_time = time.time()
+        total_seconds = round(end_time - start_time, 2)
+        
+        # 3. Add the time to your final JSON output
+        result_data["processing_time_seconds"] = total_seconds
+        
         return result_data
         
     except Exception as e:
-        # If anything goes wrong, clean up the files and show the error
         if os.path.exists(video_path): os.remove(video_path)
         if os.path.exists(audio_path): os.remove(audio_path)
         raise HTTPException(status_code=500, detail=str(e))
