@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from groq import Groq
-from moviepy.editor import VideoFileClip
+from moviepy import VideoFileClip
 import shutil
 import os
 import json
