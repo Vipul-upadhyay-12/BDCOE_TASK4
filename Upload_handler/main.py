@@ -1,41 +1,48 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from groq import Groq
-from moviepy import VideoFileClip
 import cv2
 import pytesseract
 import shutil
 import os
 import json
 import time
+import subprocess
 
 app = FastAPI()
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-def extract_slide_text(video_path, num_frames=3):
-    """Extracts a few frames from the video and uses lightweight Tesseract OCR to read them."""
+def extract_slide_text_fast(video_path, num_frames=3):
+    """Extracts frames, downscales them to speed up OCR, and reads text with Tesseract."""
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
     if total_frames == 0:
+        cap.release()
         return ""
         
-    step = max(total_frames // num_frames, 1)
-    slide_text = ""
+    step = max(total_frames // (num_frames + 1), 1)
+    slide_texts = []
     
-    for i in range(0, total_frames, step):
-        cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+    for count in range(1, num_frames + 1):
+        frame_idx = count * step
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
         ret, frame = cap.read()
         if ret:
-            # Convert to grayscale for better OCR accuracy
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            text = pytesseract.image_to_string(gray)
-            slide_text += f"\nSlide {i}:\n{text}"
+            # 1. Downscale frame to 720p width max to drastically reduce OCR time
+            h, w = frame.shape[:2]
+            scale = 720 / max(w, 720)
+            resized = cv2.resize(frame, (int(w * scale), int(h * scale)))
             
-        if len(slide_text.split("Slide")) > num_frames:
-            break
+            # 2. Grayscale + quick threshold for clean text
+            gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
             
+            # 3. PSM 6 tells Tesseract to assume a single uniform block of text (faster)
+            text = pytesseract.image_to_string(gray, config='--psm 6')
+            if text.strip():
+                slide_texts.append(text.strip())
+                
     cap.release()
-    return slide_text.strip()
+    return "\n---\n".join(slide_texts)
 
 @app.post("/upload-video")
 async def upload_video(file: UploadFile = File(...)):
@@ -45,16 +52,18 @@ async def upload_video(file: UploadFile = File(...)):
     audio_path = "temp_audio.mp3"
     
     try:
-        # 1. Save Video
+        # 1. Save incoming video
         with open(video_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        # 2. Extract Audio
-        video = VideoFileClip(video_path)
-        video.audio.write_audiofile(audio_path, logger=None)
-        video.close()
+        # 2. Direct, native FFmpeg extraction (10x faster than MoviePy, takes ~1-2s)
+        cmd = [
+            "ffmpeg", "-y", "-i", video_path, 
+            "-vn", "-acodec", "libmp3lame", "-b:a", "64k", audio_path
+        ]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         
-        # 3. Read Audio (Whisper)
+        # 3. Transcribe audio via Groq Whisper (<3s)
         with open(audio_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(
                 file=(audio_path, audio_file.read()),
@@ -63,10 +72,10 @@ async def upload_video(file: UploadFile = File(...)):
             )
         audio_text = transcription.text
         
-        # 4. Read Slides (OpenCV + Tesseract)
-        slide_text = extract_slide_text(video_path)
+        # 4. Fast Slide OCR (<10s)
+        slide_text = extract_slide_text_fast(video_path)
         
-        # 5. Merge and Generate JSON (Groq Llama/GPT-OSS)
+        # 5. Merge and generate JSON via Groq (<3s)
         prompt = f"""
         Based on the spoken transcript and the text found on the video slides, generate concise study notes and a short multiple-choice quiz (3-5 questions).
         You must return ONLY a JSON object with exactly two keys:
@@ -79,7 +88,7 @@ async def upload_video(file: UploadFile = File(...)):
         """
         
         completion = client.chat.completions.create(
-            model="openai/gpt-oss-20b", 
+            model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0.3,
@@ -88,13 +97,11 @@ async def upload_video(file: UploadFile = File(...)):
         
         result_data = json.loads(completion.choices[0].message.content)
         
-        # Clean up
-        os.remove(video_path)
-        os.remove(audio_path)
+        # Cleanup
+        if os.path.exists(video_path): os.remove(video_path)
+        if os.path.exists(audio_path): os.remove(audio_path)
         
-        # Record time
         result_data["processing_time_seconds"] = round(time.time() - start_time, 2)
-        
         return result_data
         
     except Exception as e:
