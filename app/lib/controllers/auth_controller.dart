@@ -6,6 +6,9 @@ import '../routes/app_pages.dart';
 
 class AuthController extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(); // <-- ADD THIS LINE
+
+  // ... your text controllers and isLoading variable
 
   // Login inputs
   late final TextEditingController loginEmailController;
