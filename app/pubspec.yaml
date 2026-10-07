@@ -7,11 +7,15 @@ environment:
   sdk: ^3.12.2
 
 dependencies:
-  firebase_auth: ^6.7.0
+  firebase_auth: ^5.4.0
+  firebase_core: ^3.10.0
   flutter:
     sdk: flutter
   flutter_svg: ^2.3.0
   get: ^4.7.3
+  google_sign_in: 6.2.1
+  http: 
+  shared_preferences:
 
 dev_dependencies:
   flutter_test:
