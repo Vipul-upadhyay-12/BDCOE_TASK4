@@ -1,3 +1,4 @@
+import 'package:app/widgets/app_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -37,12 +38,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final userName = user?.displayName?.split(' ').first ?? 'Friend';
 
     return Scaffold(
+      key: _scaffoldKey, // 2. Attach key here
+      drawer: const AppDrawer(),
+      
       backgroundColor: const Color(0xff181818),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -59,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                     icon: const Icon(Icons.menu, color: Color(0xffffd000), size: 30),
-                    onPressed: () {},
+                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                   ),
                   const Text(
                     'ToolForge',

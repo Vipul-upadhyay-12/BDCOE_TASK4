@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:app/screens/quiz_screen.dart';
 import 'package:app/services/api_service.dart';
+import 'package:app/services/storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -55,6 +56,12 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
 
       print(">>> 4. API Success! Response keys: ${responseData.keys}");
 
+      await StorageService.saveSession(
+        title: responseData['title'] ?? 'Study Notes & Quiz',
+        notes: responseData['notes'] ?? '',
+        quizData: responseData,
+      );
+
       if (Get.isDialogOpen ?? false) Get.back(); // Dismiss loading dialog
       setState(() => isLoading = false);
 
@@ -63,6 +70,8 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
             quizData: responseData,
             timerMinutes: 10,
           ));
+      
+      
     } catch (e, stack) {
       print(">>> CATCH ERROR: $e");
       print(">>> STACK TRACE: $stack");
@@ -100,7 +109,7 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                   IconButton(
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.menu, color: Color(0xffffd000), size: 30),
+                    icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xffffd000), size: 24),
                     onPressed: () => Get.back(),
                   ),
                   const Text(
