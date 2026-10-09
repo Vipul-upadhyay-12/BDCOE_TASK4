@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-
-import 'package:helloworld/fileUpload.dart';
+import 'package:get/get.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'fileUpload.dart';
 import 'transferUrl.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -36,364 +37,301 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final userName = user?.displayName?.split(' ').first ?? 'Friend';
+
     return Scaffold(
       backgroundColor: const Color(0xff181818),
       body: SafeArea(
         child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 25,
-              vertical: 20,
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Icon(
-                      Icons.menu,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.menu, color: Color(0xffffd000), size: 30),
+                    onPressed: () {},
+                  ),
+                  const Text(
+                    'ToolForge',
+                    style: TextStyle(
                       color: Color(0xffffd000),
-                      size: 30,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
-                    const Text(
-                      'ToolForge',
-                      style: TextStyle(
-                        color: Color(0xffffd000),
-                        fontFamily: 'TwCenMT',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Dynamic Greeting
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hey $userName,',
+                      style: const TextStyle(
+                        color: Color(0xffffcce9),
                         fontSize: 30,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 170,
+                      height: 2,
+                      color: const Color(0xff9b7d8e),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 25),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Hey Yash,',
-                        style: TextStyle(
-                          color: Color(0xffffcce9),
-                          fontSize: 31,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        width: 190,
-                        height: 2,
-                        color: const Color(0xff9b7d8e),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 30),
-                const Text(
-                  'Upload a file or URL and get\n'
-                  'choicest extracts from it',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xffffd000),
-                    fontSize: 20,
-                    fontWeight: FontWeight.w500,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final cardWidth = (constraints.maxWidth + 15) / 2;
-                    final cardHeight = cardWidth * 400 / 185;
-                    final imageHeight = cardWidth * 216 / 185;
-                    final scale = cardWidth / 185;
+              ),
+              const SizedBox(height: 26),
 
-                    return Align(
-                      alignment: Alignment.center,
-                      child: SizedBox(
-                        height: cardHeight + 20,
-                        child: Stack(
-                          children: [
-                            Positioned(
-                              left: 0,
-                              top: 20,
-                              child: AnimatedBuilder(
-                                animation: _leftController,
-                                builder: (context, child) {
-                                  return Transform.translate(
-                                    offset: Offset(
-                                      0,
-                                      _leftController.value * 16 - 8,
+              // Subheading
+              const Text(
+                'Upload a file or URL and get\nchoicest extracts from it',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xffffd000),
+                  fontSize: 19,
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Responsive Two Cards
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const cardGap = 14.0;
+                  final cardWidth = (constraints.maxWidth - cardGap) / 2;
+                  final cardHeight = cardWidth * 2.1;
+                  final scale = cardWidth / 175;
+
+                  return SizedBox(
+                    height: cardHeight + 24,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left Card: Transfer a URL
+                        AnimatedBuilder(
+                          animation: _leftController,
+                          builder: (context, child) {
+                            return Transform.translate(
+                              offset: Offset(0, _leftController.value * 12 - 6),
+                              child: child,
+                            );
+                          },
+                          child: GestureDetector(
+                            onTap: () => Get.to(() => const transferUrl()),
+                            child: Container(
+                              width: cardWidth,
+                              height: cardHeight,
+                              decoration: BoxDecoration(
+                                color: const Color(0xff242424),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xffffd000), width: 2.5),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(13.5),
+                                child: Column(
+                                  children: [
+                                    SizedBox(
+                                      height: cardHeight * 0.52,
+                                      width: double.infinity,
+                                      child: Image.asset(
+                                        'assets/card2.png',
+                                        fit: BoxFit.cover,
+                                      ),
                                     ),
-                                    child: child,
-                                  );
-                                },
-                                child: Container(
-                                  width: cardWidth,
-                                  height: cardHeight,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xff242424),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: const Color(0xffffd000),
-                                      width: 3,
-                                    ),
-                                  ),
-                                  child: Stack(
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                      // TEXT AREA
-                                      Positioned(
-                                        left: 0,
-                                        right: 0,
-                                        top: 205 * scale,
-                                        bottom: 0,
-                                        child: GestureDetector(
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) =>
-                                                    transferUrl(),
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            const Spacer(),
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                                              textBaseline: TextBaseline.alphabetic,
+                                              children: [
+                                                Text(
+                                                  'T',
+                                                  style: TextStyle(
+                                                    color: const Color(0xffffd000),
+                                                    fontSize: 55 * scale,
+                                                    fontWeight: FontWeight.w900,
+                                                    height: 1,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'ransfer',
+                                                  style: TextStyle(
+                                                    color: const Color(0xffffcce9),
+                                                    fontSize: 20 * scale,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Text(
+                                              'a url',
+                                              style: TextStyle(
+                                                color: const Color(0xffffcce9),
+                                                fontSize: 20 * scale,
+                                                fontWeight: FontWeight.bold,
                                               ),
-                                            );
-                                          },
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 10,
                                             ),
-                                            child: Column(
-                                              children: [
-                                                const SizedBox(height: 25),
-                                                Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  children: [
-                                                    Text(
-                                                      'T',
-                                                      style: TextStyle(
-                                                        color:
-                                                            Color(0xffffd000),
-                                                        fontSize: 80 * scale,
-                                                        height: 1,
-                                                      ),
-                                                    ),
-                                                    Transform.translate(
-                                                      offset: Offset(
-                                                        -10 * scale,
-                                                        19 * scale,
-                                                      ),
-                                                      child: Text(
-                                                        'ransfer',
-                                                        style: TextStyle(
-                                                          color: Color(
-                                                            0xffffcce9,
-                                                          ),
-                                                          fontSize: 25 * scale,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                Text(
-                                                  'a url',
-                                                  style: TextStyle(
-                                                    color: Color(0xffffcce9),
-                                                    fontSize: 25 * scale,
-                                                  ),
-                                                ),
-                                                const Spacer(),
-                                                Align(
-                                                  alignment:
-                                                      Alignment.bottomLeft,
-                                                  child: Text(
-                                                    'Click',
-                                                    style: TextStyle(
-                                                      color: Color(0xffa9a9a9),
-                                                      fontSize: 11 * scale,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
+                                            const Spacer(),
+                                            const Align(
+                                              alignment: Alignment.bottomLeft,
+                                              child: Text(
+                                                'Click',
+                                                style: TextStyle(color: Color(0xffa9a9a9), fontSize: 11),
+                                              ),
                                             ),
-                                          ),
+                                          ],
                                         ),
                                       ),
-                                      Positioned(
-                                        left: -3,
-                                        top: -4,
-                                        width: cardWidth,
-                                        height: imageHeight,
-                                        child: Image.asset(
-                                          'assets/card2.png',
-                                          fit: BoxFit.fill,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                            Positioned(
-                              right: 0,
-                              top: 0,
-                              child: AnimatedBuilder(
-                                animation: _rightController,
-                                builder: (context, child) {
-                                  return Transform.translate(
-                                    offset: Offset(
-                                      0,
-                                      -(_rightController.value * 16 - 8),
-                                    ),
-                                    child: child,
-                                  );
-                                },
-                                child: Container(
-                                  width: cardWidth,
-                                  height: cardHeight,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xff242424),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: const Color(0xffffd000),
-                                      width: 3,
-                                    ),
-                                  ),
-                                  child: Stack(
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                      Positioned(
-                                        left: 0,
-                                        right: 0,
-                                        top: 0,
-                                        bottom: 0,
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 10,
-                                          ),
-                                          child: GestureDetector(
-                                            onTap: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      fileUpload(),
-                                                ),
-                                              );
-                                            },
-                                            child: Column(
-                                              children: [
-                                                SizedBox(height: 30),
-                                                RichText(
-                                                  textAlign: TextAlign.center,
-                                                  text: TextSpan(
-                                                    children: [
-                                                      TextSpan(
-                                                        text: 'F',
-                                                        style: TextStyle(
-                                                          color:
-                                                              Color(0xffffd000),
-                                                          fontSize: 80 * scale,
-                                                          height: 0.9,
-                                                        ),
-                                                      ),
-                                                      TextSpan(
-                                                        text: 'ile',
-                                                        style: TextStyle(
-                                                          color: Color(
-                                                            0xffffcce9,
-                                                          ),
-                                                          fontSize: 25 * scale,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                Text(
-                                                  'upload',
-                                                  style: TextStyle(
-                                                    color: Color(0xffffcce9),
-                                                    fontSize: 25 * scale,
-                                                  ),
-                                                ),
-                                                const Spacer(),
-                                                Align(
-                                                  alignment:
-                                                      Alignment.bottomRight,
-                                                  child: Transform.translate(
-                                                    offset: Offset(
-                                                      0,
-                                                      -210 * scale,
-                                                    ),
-                                                    child: Text(
-                                                      'Click',
-                                                      style: TextStyle(
-                                                        color:
-                                                            Color(0xffa9a9a9),
-                                                        fontSize: 11,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      // IMAGE
-                                      Positioned(
-                                        left: -3,
-                                        bottom: -3,
-                                        width: cardWidth,
-                                        height: imageHeight,
-                                        child: Image.asset(
-                                          'assets/card.png',
-                                          fit: BoxFit.fill,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-                SizedBox(height: 25),
-                Align(
-                  alignment: Alignment.center,
-                  child: Text(
-                    'Upload Specs Below',
-                    style: const TextStyle(
-                      color: Color(0xffffcce9),
-                      fontSize: 15,
-                      height: 1.55,
+
+                        // Right Card: File Upload
+                        AnimatedBuilder(
+                          animation: _rightController,
+                          builder: (context, child) {
+                            return Transform.translate(
+                              offset: Offset(0, -(_rightController.value * 12 - 6)),
+                              child: child,
+                            );
+                          },
+                          child: GestureDetector(
+                            onTap: () => Get.to(() => fileUpload()),
+                            child: Container(
+                              width: cardWidth,
+                              height: cardHeight,
+                              decoration: BoxDecoration(
+                                color: const Color(0xff242424),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xffffd000), width: 2.5),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(13.5),
+                                child: Column(
+                                  children: [
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            const Spacer(),
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                                              textBaseline: TextBaseline.alphabetic,
+                                              children: [
+                                                Text(
+                                                  'F',
+                                                  style: TextStyle(
+                                                    color: const Color(0xffffd000),
+                                                    fontSize: 55 * scale,
+                                                    fontWeight: FontWeight.w900,
+                                                    height: 1,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'ile',
+                                                  style: TextStyle(
+                                                    color: const Color(0xffffcce9),
+                                                    fontSize: 20 * scale,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Text(
+                                              'upload',
+                                              style: TextStyle(
+                                                color: const Color(0xffffcce9),
+                                                fontSize: 20 * scale,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            const Align(
+                                              alignment: Alignment.bottomRight,
+                                              child: Text(
+                                                'Click',
+                                                style: TextStyle(color: Color(0xffa9a9a9), fontSize: 11),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      height: cardHeight * 0.52,
+                                      width: double.infinity,
+                                      child: Image.asset(
+                                        'assets/card.png',
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+
+              const Center(
+                child: Text(
+                  'Upload Specs Below',
+                  style: TextStyle(
+                    color: Color(0xffffcce9),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Video, Audio and Text files supported\n'
-                    'specific- mp4, mp3, txt, pdf\n'
-                    'Max. Size: 28 Mb',
-                    style: const TextStyle(
-                      color: Color(0xffffcce9),
-                      fontSize: 15,
-                      height: 1.55,
-                    ),
-                  ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Video, Audio and Text files supported\nspecific- mp4, mp3, txt, pdf\nMax. Size: 28 Mb',
+                textAlign: TextAlign.left,
+                style: TextStyle(
+                  color: Color(0xffffcce9),
+                  fontSize: 14,
+                  height: 1.45,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
         ),
       ),

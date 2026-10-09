@@ -12,7 +12,7 @@ class SplashView extends GetView<SplashController> {
       backgroundColor: const Color(0xFF151515),
       body: SizedBox.expand(
         child: SvgPicture.asset(
-          'assets/images/splashbg.svg',
+          'assets/splashbg.svg',
           fit: BoxFit.cover,
           alignment: Alignment.center,
         ),

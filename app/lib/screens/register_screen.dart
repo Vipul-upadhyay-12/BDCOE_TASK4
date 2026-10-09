@@ -81,7 +81,7 @@ class RegisterView extends GetView<AuthController> {
                   child: OutlinedButton.icon(
                     onPressed: () {},
                     icon: Image.asset(
-                      'assets/images/glogo.png',
+                      'assets/glogo.png',
                       height: 22,
                       width: 22,
                     ),

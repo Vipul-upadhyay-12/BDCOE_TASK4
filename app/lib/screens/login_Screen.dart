@@ -6,6 +6,8 @@ import '../routes/app_pages.dart';
 class LoginView extends GetView<AuthController> {
   const LoginView({super.key});
 
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -74,9 +76,9 @@ class LoginView extends GetView<AuthController> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () => controller.signInWithGoogle(),
                     icon: Image.asset(
-                      'assets/images/glogo.png',
+                      'assets/glogo.png',
                       height: 22,
                       width: 22,
                     ),
