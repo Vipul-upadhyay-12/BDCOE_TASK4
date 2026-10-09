@@ -175,16 +175,39 @@ Source Content:
 ---
 """
 
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": user_content},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.3,
-            max_tokens=4096,
-        )
+        # Models prioritized by availability on standard developer keys
+        candidate_models = [
+            "llama-3.1-8b-instant",
+            "openai/gpt-oss-20b",
+            "llama-3.3-70b-versatile",
+        ]
+
+        completion = None
+        last_error = None
+
+        for model_name in candidate_models:
+            try:
+                completion = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": system_instruction},
+                        {"role": "user", "content": user_content},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.3,
+                    max_tokens=4096,
+                )
+                if completion:
+                    break
+            except Exception as err:
+                last_error = err
+                continue
+
+        if not completion:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Groq generation failed across all models. Last error: {str(last_error)}",
+            )
 
         result_data = json.loads(completion.choices[0].message.content)
         result_data["processing_time_seconds"] = round(time.time() - start_time, 2)
