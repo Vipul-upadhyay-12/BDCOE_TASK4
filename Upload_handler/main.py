@@ -118,13 +118,17 @@ async def generate_quiz(
                 check=True,
             )
 
+            # Ultra-fast downsampling: 16kHz mono audio directly for Whisper (takes ~3s instead of 2+ minutes)
             subprocess.run(
-                ["ffmpeg", "-y", "-ss", "00:00:03", "-i", video_path, "-frames:v", "1", "-q:v", "2", image_path],
+                [
+                    "ffmpeg", "-y", "-i", video_path,
+                    "-vn", "-ac", "1", "-ar", "16000",
+                    "-b:a", "32k", audio_path
+                ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 check=True,
             )
-
             with open(audio_path, "rb") as af:
                 transcription = client.audio.transcriptions.create(
                     file=(audio_path, af.read()),
