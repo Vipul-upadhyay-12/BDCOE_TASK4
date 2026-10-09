@@ -1,6 +1,7 @@
 fastapi
 uvicorn
-python-multipart
 groq
-opencv-python-headless
-pytesseract
+requests
+pypdf
+python-pptx
+python-multipart
