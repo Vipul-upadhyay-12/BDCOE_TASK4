@@ -12,17 +12,29 @@ class FileProcessingController extends GetxController {
 
   // Pick file from device storage
   Future<void> pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'txt', 'mp3', 'mp4'],
-    );
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'txt', 'mp3', 'mp4'],
+      );
 
-    if (result != null && result.files.single.path != null) {
-      selectedFile.value = File(result.files.single.path!);
-      fileName.value = result.files.single.name;
+      if (result != null && result.files.isNotEmpty) {
+        final platformFile = result.files.single;
+        debugPrint('File selected: ${platformFile.name}');
+        debugPrint('File path: ${platformFile.path}');
+
+        if (platformFile.path != null) {
+          selectedFile.value = File(platformFile.path!);
+        }
+        // Update the observable string
+        fileName.value = platformFile.name;
+      } else {
+        debugPrint('User canceled file picker');
+      }
+    } catch (e) {
+      debugPrint('Error picking file: $e');
     }
   }
-
   // Handle Quiz Card Tap -> Goes to Configuration Screen
   void onQuizTapped() {
     if (selectedFile.value == null) {

@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:app/screens/quiz_screen.dart';
+import 'package:app/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -12,12 +14,73 @@ class QuizConfigScreen extends StatefulWidget {
 }
 
 class _QuizConfigScreenState extends State<QuizConfigScreen> {
+
+  bool isLoading = false;
+  final TextEditingController customPromptController = TextEditingController();
+  int numQuestions = 5;
+  String difficulty = 'Medium';
   // Config state
   String structure = 'Multiple Choice Questions';
   String content = 'Mixed';
-  String difficulty = 'Medium';
-  int numQuestions = 5;
   int timerMinutes = 10;
+
+
+  Future<void> _handleGenerate() async {
+    print(">>> 1. GENERATE BUTTON TAPPED");
+
+    if (isLoading) return; // Prevent multiple taps
+
+    print(">>> 2. File path: ${widget.file.path}");
+    setState(() => isLoading = true);
+
+    // Show loading modal overlay
+    Get.dialog(
+      const PopScope(
+        canPop: false,
+        child: Center(
+          child: CircularProgressIndicator(color: Color(0xffffd000)),
+        ),
+      ),
+      barrierDismissible: false,
+    );
+
+    try {
+      print(">>> 3. Calling ApiService.generateQuiz...");
+      final responseData = await ApiService.generateQuiz(
+        file: widget.file,
+        numQuestions: numQuestions,
+        difficulty: difficulty,
+        customPrompt: customPromptController.text.trim(),
+      );
+
+      print(">>> 4. API Success! Response keys: ${responseData.keys}");
+
+      if (Get.isDialogOpen ?? false) Get.back(); // Dismiss loading dialog
+      setState(() => isLoading = false);
+
+      // Route directly to your QuizScreen
+      Get.to(() => QuizScreen(
+            quizData: responseData,
+            timerMinutes: 10,
+          ));
+    } catch (e, stack) {
+      print(">>> CATCH ERROR: $e");
+      print(">>> STACK TRACE: $stack");
+
+      if (Get.isDialogOpen ?? false) Get.back(); // Dismiss loading dialog
+      setState(() => isLoading = false);
+
+      Get.snackbar(
+        'Generation Failed',
+        e.toString(),
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 5),
+      );
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -145,31 +208,35 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
               const SizedBox(height: 12),
 
               // Generate Action Button
-              ElevatedButton(
-                onPressed: () {
-                  // We will plug in the fun facts loading screen here next!
-                  Get.snackbar(
-                    'Config Selected',
-                    '$numQuestions Questions | $timerMinutes min | $difficulty',
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _handleGenerate,
+                  style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xffffd000),
-                    colorText: Colors.black,
-                    snackPosition: SnackPosition.BOTTOM,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xfff5c700),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 2,
                   ),
-                ),
-                child: const Text(
-                  'Generate',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.black,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          'Generate Quiz',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -238,6 +305,9 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
       ),
     );
   }
+
+  
+  
 
   Widget _buildGridOptions({
     required List<int> values,

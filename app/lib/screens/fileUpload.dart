@@ -4,7 +4,7 @@ import 'package:get/get.dart';
 
 class fileUpload extends StatelessWidget {
   fileUpload({super.key});
-  final controller = Get.find(FileProcessingController());
+  final FileProcessingController controller = Get.put(FileProcessingController());
   
   @override
   Widget build(BuildContext context) {

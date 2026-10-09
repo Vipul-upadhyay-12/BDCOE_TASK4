@@ -3,20 +3,24 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // Replace with your actual Render deployment URL (no trailing slash)
-  static const String baseUrl = 'https://bdcoe-task4-1.onrender.com/';
+  // Your deployed or local backend URL
+  static const String baseUrl = 'https://bdcoe-task4.onrender.com';
 
-  /// Upload file and generate quiz or notes
-  /// [taskType]: 'quiz' or 'notes'
+  /// General file processing for notes/summaries
   static Future<Map<String, dynamic>> processFile({
     required File file,
     required String taskType,
   }) async {
-    final uri = Uri.parse('$baseUrl/generate');
+    final uri = Uri.parse('$baseUrl/generate-quiz');
+    final request = http.MultipartRequest('POST', uri);
 
-    final request = http.MultipartRequest('POST', uri)
-      ..fields['task_type'] = taskType
-      ..files.add(await http.MultipartFile.fromPath('file', file.path));
+    request.fields['num_questions'] = '5';
+    request.fields['difficulty'] = 'Medium';
+    request.fields['custom_prompt'] = 'Task: $taskType. Focus on generating detailed study notes.';
+
+    request.files.add(
+      await http.MultipartFile.fromPath('file', file.path),
+    );
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
@@ -28,18 +32,28 @@ class ApiService {
     }
   }
 
-  /// Process via URL endpoint if needed
-  static Future<Map<String, dynamic>> processUrl({
-    required String url,
-    required String taskType,
+  /// Specialized quiz generation with full configuration options
+  static Future<Map<String, dynamic>> generateQuiz({
+    required File file,
+    required int numQuestions,
+    required String difficulty,
+    String? customPrompt,
   }) async {
-    final uri = Uri.parse('$baseUrl/process-url');
+    final uri = Uri.parse('$baseUrl/generate-quiz');
+    final request = http.MultipartRequest('POST', uri);
 
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'url': url, 'task_type': taskType}),
+    request.fields['num_questions'] = numQuestions.toString();
+    request.fields['difficulty'] = difficulty;
+    if (customPrompt != null && customPrompt.trim().isNotEmpty) {
+      request.fields['custom_prompt'] = customPrompt.trim();
+    }
+
+    request.files.add(
+      await http.MultipartFile.fromPath('file', file.path),
     );
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
