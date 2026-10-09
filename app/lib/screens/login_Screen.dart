@@ -10,6 +10,7 @@ class LoginView extends GetView<AuthController> {
 
   @override
   Widget build(BuildContext context) {
+    final authController = Get.put(AuthController());
     return Scaffold(
       backgroundColor: const Color(0xFF151515),
       body: SafeArea(

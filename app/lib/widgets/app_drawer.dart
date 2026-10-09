@@ -1,3 +1,7 @@
+import 'package:app/routes/app_pages.dart';
+import 'package:app/screens/login_Screen.dart';
+import 'package:app/services/storage_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../screens/library_screen.dart'; // We'll link this next
@@ -71,9 +75,15 @@ class AppDrawer extends StatelessWidget {
 
               // Red Logout at Bottom matching design
               InkWell(
-                onTap: () {
-                  // Put your Firebase signOut / auth logic here
-                  Get.back();
+                onTap: () async {
+    
+                  await StorageService.clearAllData();
+
+                  // 2. Sign out of Firebase Auth
+                  await FirebaseAuth.instance.signOut();
+
+                  // 3. Clear GetX navigation stack and redirect to Login
+                  Get.offAllNamed(Routes.LOGIN);
                 },
                 child: const Row(
                   children: [

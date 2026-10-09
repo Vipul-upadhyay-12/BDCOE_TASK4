@@ -63,6 +63,10 @@ class StorageService {
     final rawList = prefs.getStringList(_key) ?? [];
     return rawList.map((item) => SavedSession.fromMap(jsonDecode(item))).toList();
   }
+  static Future<void> clearAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key); // Removes 'saved_study_sessions'
+  }
 
   static Future<void> deleteSession(String id) async {
     final prefs = await SharedPreferences.getInstance();
