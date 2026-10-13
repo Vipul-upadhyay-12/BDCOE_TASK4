@@ -1,98 +1,211 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from groq import Groq
-import requests
-import shutil
 import os
-import json
+import io
 import time
+import json
+import shutil
 import subprocess
+from typing import Optional
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from groq import Groq
+from pypdf import PdfReader
+from pptx import Presentation
 
-app = FastAPI()
+app = FastAPI(title="ToolForge Universal Handler")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-def get_ocr_text(image_path):
-    """Sends the extracted frame to a free, dedicated OCR API to avoid crashing Render's CPU."""
-    try:
-        with open(image_path, 'rb') as f:
-            response = requests.post(
-                'https://api.ocr.space/parse/image',
-                files={image_path: f},
-                data={'apikey': 'helloworld', 'language': 'eng'}
-            )
-        result = response.json()
-        if not result.get("IsErroredOnProcessing") and result.get("ParsedResults"):
-            return result["ParsedResults"][0]["ParsedText"]
-    except Exception:
-        pass
+
+def extract_text_from_pptx(file_bytes: bytes) -> str:
+    prs = Presentation(io.BytesIO(file_bytes))
+    text_runs = []
+    for i, slide in enumerate(prs.slides):
+        slide_texts = []
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for paragraph in shape.text_frame.paragraphs:
+                    line = paragraph.text.strip()
+                    if line:
+                        slide_texts.append(line)
+        if slide_texts:
+            text_runs.append(f"--- Slide {i + 1} ---\n" + "\n".join(slide_texts))
+    return "\n\n".join(text_runs)
+
+
+def extract_text_from_doc(file_bytes: bytes, filename: str) -> str:
+    name = filename.lower()
+    if name.endswith(".pdf"):
+        reader = PdfReader(io.BytesIO(file_bytes))
+        pages_text = [page.extract_text() or "" for page in reader.pages]
+        return "\n".join(pages_text).strip()
+    elif name.endswith(".pptx"):
+        return extract_text_from_pptx(file_bytes)
+    elif name.endswith(".txt"):
+        return file_bytes.decode("utf-8", errors="ignore").strip()
     return ""
 
-@app.post("/upload-video")
-async def upload_video(file: UploadFile = File(...)):
+
+@app.post("/generate-quiz")
+async def generate_quiz(
+    file: UploadFile = File(...),
+    num_questions: int = Form(5),
+    difficulty: str = Form("Medium"),
+    custom_prompt: Optional[str] = Form(None),
+):
     start_time = time.time()
-    
-    video_path = f"temp_{file.filename}"
-    audio_path = "temp_audio.mp3"
-    image_path = "temp_frame.jpg"
-    
+    filename = file.filename or "uploaded_file"
+    ext = os.path.splitext(filename)[1].lower()
+
+    # Unique temp file naming to prevent collisions
+    timestamp_prefix = int(time.time())
+    video_path = f"temp_{timestamp_prefix}_{filename}"
+    audio_path = f"temp_{timestamp_prefix}.mp3"
+
+    context_text = ""
+
     try:
-        # 1. Save Video
-        with open(video_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-        # 2. Extract Audio (Native FFmpeg = ~1 second)
-        subprocess.run([
-            "ffmpeg", "-y", "-i", video_path, 
-            "-vn", "-acodec", "libmp3lame", "-b:a", "64k", audio_path
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-        
-        # 3. Extract 1 Key Slide (Native FFmpeg = ~0.2 seconds)
-        # Grabs a frame 3 seconds into the video to avoid black starting screens
-        subprocess.run([
-            "ffmpeg", "-y", "-ss", "00:00:03", "-i", video_path, 
-            "-frames:v", "1", "-q:v", "2", image_path
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-        
-        # 4. Transcribe Audio (Groq API = ~2 seconds)
-        with open(audio_path, "rb") as audio_file:
+        # 1. Documents (PDF, PPTX, TXT) -> Sub-second processing
+        if ext in [".pdf", ".pptx", ".txt"]:
+            file_bytes = await file.read()
+            context_text = extract_text_from_doc(file_bytes, filename)
+
+        # 2. Pure Audio (MP3, WAV, M4A) -> Direct Whisper transcription
+        elif ext in [".mp3", ".wav", ".m4a", ".aac"]:
+            content = await file.read()
             transcription = client.audio.transcriptions.create(
-                file=(audio_path, audio_file.read()),
+                file=(filename, content),
                 model="whisper-large-v3",
                 response_format="json",
             )
-        audio_text = transcription.text
-        
-        # 5. Extract Text from Slide (OCR.space API = ~2 seconds)
-        slide_text = get_ocr_text(image_path)
-        
-        # 6. Merge & Format (Groq LLM = ~2 seconds)
-        prompt = f"""
-        Based on the spoken transcript and the text found on the video slides, generate concise study notes and a short multiple-choice quiz (3-5 questions).
-        You must return ONLY a JSON object with exactly two keys:
-        1. "notes": A string containing Markdown-formatted study notes.
-        2. "quiz": A list of question objects, each with 'question' (string), 'options' (list of strings), and 'answer' (string).
-        
-        Spoken Transcript: {audio_text}
-        Slide Text: {slide_text}
-        """
-        
-        completion = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            temperature=0.3,
-            max_tokens=4096,
+            context_text = transcription.text
+
+        # 3. Video (MP4, MKV, MOV) -> Single-pass extraction
+        elif ext in [".mp4", ".mkv", ".mov", ".avi", ".webm"]:
+            with open(video_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            # Single-pass fast audio stripping: mono, 16kHz, low bitrate (under 5 seconds)
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",
+                "-i", video_path,
+                "-vn",
+                "-ac", "1",
+                "-ar", "16000",
+                "-b:a", "32k",
+                audio_path
+            ]
+            subprocess.run(
+                ffmpeg_cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True
+            )
+
+            with open(audio_path, "rb") as af:
+                transcription = client.audio.transcriptions.create(
+                    file=(audio_path, af.read()),
+                    model="whisper-large-v3",
+                    response_format="json",
+                )
+            context_text = transcription.text
+
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported format '{ext}'. Supported: .pdf, .pptx, .txt, .mp3, .wav, .mp4, .mkv",
+            )
+
+        if not context_text or not context_text.strip():
+            raise HTTPException(status_code=400, detail="No readable content or transcript found in file.")
+
+        # Limit context window to the first 12,000 characters for instant LLM response
+        context_preview = context_text[:12000]
+
+        system_instruction = (
+            "You are an assessment engine. You MUST respond ONLY with valid JSON matching this schema:\n"
+            "{\n"
+            '  "title": "string",\n'
+            '  "notes": "string (summary in markdown)",\n'
+            '  "quiz": [\n'
+            "    {\n"
+            '      "id": 1,\n'
+            '      "question": "string",\n'
+            '      "options": ["Option A", "Option B", "Option C", "Option D"],\n'
+            '      "answer": "Option A",\n'
+            '      "explanation": "string"\n'
+            "    }\n"
+            "  ]\n"
+            "}"
         )
-        
+
+        user_content = f"""
+Number of Questions: {num_questions}
+Target Difficulty: {difficulty}
+Custom Instructions: {custom_prompt or "Focus on core concepts."}
+
+Source Content:
+---
+{context_preview}
+---
+"""
+
+        # Llama 3.1 8b is ultra-fast (~1-2 seconds on Groq LPUs)
+        candidate_models = [
+            "llama-3.1-8b-instant",
+            "llama-3.3-70b-versatile",
+        ]
+
+        completion = None
+        last_error = None
+
+        for model_name in candidate_models:
+            try:
+                completion = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": system_instruction},
+                        {"role": "user", "content": user_content},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.2,
+                    max_tokens=3000,
+                )
+                if completion:
+                    break
+            except Exception as err:
+                last_error = err
+                continue
+
+        if not completion:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Groq generation failed across all models. Last error: {str(last_error)}",
+            )
+
         result_data = json.loads(completion.choices[0].message.content)
-        
-        # Cleanup files
-        for p in [video_path, audio_path, image_path]:
-            if os.path.exists(p): os.remove(p)
-            
         result_data["processing_time_seconds"] = round(time.time() - start_time, 2)
         return result_data
-        
+
     except Exception as e:
-        for p in [video_path, audio_path, image_path]:
-            if os.path.exists(p): os.remove(p)
         raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        for p in [video_path, audio_path]:
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+
+
+@app.get("/")
+def root():
+    return {"status": "running", "service": "ToolForge Backend"}
