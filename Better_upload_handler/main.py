@@ -78,7 +78,7 @@ Source Content:
 """
 
     completion = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model="llama3-8b-8192",  #
         messages=[
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": user_content},
