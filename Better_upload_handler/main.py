@@ -21,6 +21,26 @@ client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 def health_check():
     return {"status": "running", "mode": "client-side-extraction"}
 
+client = Groq(api_key=api_key)
+
+@app.get("/")
+def health_check():
+    return {"status": "running"}
+
+# === PASTE IT HERE ===
+@app.get("/check-models")
+def check_models():
+    try:
+        models = client.models.list()
+        return {
+            "key_prefix": (api_key[:8] + "...") if api_key else "None",
+            "available_models": [m.id for m in models.data]
+        }
+    except Exception as e:
+        return {"error": str(e), "key_prefix": (api_key[:8] + "...") if api_key else "None"}
+
+
+
 @app.post("/generate-quiz")
 async def generate_quiz(
     text: Optional[str] = Form(None),
