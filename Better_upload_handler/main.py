@@ -78,12 +78,11 @@ Source Content:
 """
 
     completion = client.chat.completions.create(
-        "llama-3.1-8b-instant",
-        
         messages=[
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": user_content},
         ],
+        model="llama3-8b-8192",
         response_format={"type": "json_object"},
         temperature=0.2,
     )
