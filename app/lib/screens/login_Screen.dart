@@ -29,7 +29,7 @@ class LoginView extends GetView<AuthController> {
             ),
             const SizedBox(height: 36),
 
-            // Email Field
+            
             TextFormField(
               controller: controller.loginEmailController,
               keyboardType: TextInputType.emailAddress,
@@ -38,7 +38,7 @@ class LoginView extends GetView<AuthController> {
             ),
             const SizedBox(height: 18),
 
-            // Password Field
+            
             TextFormField(
               controller: controller.loginPasswordController,
               obscureText: true,
@@ -50,7 +50,9 @@ class LoginView extends GetView<AuthController> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  
+                },
                 child: const Text(
                   'Forgot password?',
                   style: TextStyle(color: Colors.grey, fontSize: 13),
