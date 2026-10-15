@@ -198,7 +198,7 @@ SOURCE MATERIAL:
             ],
             response_format={"type": "json_object"},
             temperature=0.1,  # Keeps 8B strictly adhered to schema and count
-            max_tokens=8192,  # Fully allows comprehensive notes + 20-30 quiz items
+            max_tokens=4096,  # Fully allows comprehensive notes + 20-30 quiz items
         )
 
         raw_output = completion.choices[0].message.content.strip()
