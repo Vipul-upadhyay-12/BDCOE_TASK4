@@ -155,12 +155,13 @@ async def generate_quiz(
             )
 
         # 5. Strict LLM prompt with exact question count enforcement
+        # System instruction tuned to prevent JSON cutoff & escape crashes
         system_instruction = (
-            "You are an expert academic tutor and exam creator.\n"
-            "You MUST respond ONLY with a single valid JSON object matching this schema:\n"
+            "You are an expert academic assessment engine.\n"
+            "You MUST respond ONLY with a single valid, well-formed JSON object matching this schema:\n"
             "{\n"
             '  "title": "string",\n'
-            '  "notes": "string (exhaustive, detailed markdown study guide covering the entire document from beginning to end)",\n'
+            '  "notes": "string (concise markdown study summary, max 250 words)",\n'
             '  "quiz": [\n'
             "    {\n"
             '      "id": 1,\n'
@@ -171,16 +172,17 @@ async def generate_quiz(
             "    }\n"
             "  ]\n"
             "}\n\n"
-            "MANDATORY QUIZ REQUIREMENT:\n"
-            f"- The 'quiz' array MUST contain EXACTLY {num_questions} items.\n"
-            f"- You are strictly forbidden from returning fewer than {num_questions} questions.\n"
-            "- Ensure the questions are distributed across all concepts present throughout the material."
+            "STRICT FORMATTING RULES:\n"
+            "1. Output valid JSON only. Do not wrap with markdown backticks (no ```json).\n"
+            "2. Keep the 'notes' field concise (brief bullet points, high-yield definitions, max 250 words) to guarantee the quiz completes.\n"
+            "3. MATH NOTATION: Use plain text or Unicode math (e.g., '2^2', 'x_1', '(az + b)/(cz + d)', 'z = x + iy'). NEVER use raw LaTeX backslashes like \\frac or \\lim as they break JSON string parsing.\n"
+            f"4. The 'quiz' array MUST contain EXACTLY {num_questions} questions covering the provided syllabus."
         )
 
         user_content = f"""
-TOTAL QUESTIONS REQUIRED: {num_questions} (STRICT)
+REQUIRED QUESTIONS: {num_questions}
 DIFFICULTY: {difficulty}
-CUSTOM INSTRUCTIONS: {custom_prompt or "Provide thorough, structured study notes and high-yield questions."}
+CUSTOM INSTRUCTIONS: {custom_prompt or "Generate high-yield questions covering the material."}
 
 SOURCE MATERIAL:
 ---
@@ -188,7 +190,7 @@ SOURCE MATERIAL:
 ---
 """
 
-        print(f">>> Prompting {TARGET_LLM_MODEL} for {num_questions} questions across {len(context_text)} characters...")
+        print(f">>> Prompting {TARGET_LLM_MODEL} for {num_questions} questions...")
 
         completion = client.chat.completions.create(
             model=TARGET_LLM_MODEL,
@@ -197,8 +199,8 @@ SOURCE MATERIAL:
                 {"role": "user", "content": user_content},
             ],
             response_format={"type": "json_object"},
-            temperature=0.1,  # Keeps 8B strictly adhered to schema and count
-            max_tokens=1800,  # Fully allows comprehensive notes + 20-30 quiz items
+            temperature=0.1,
+            max_tokens=3000,  # Safe headroom without overflowing TPM
         )
 
         raw_output = completion.choices[0].message.content.strip()
