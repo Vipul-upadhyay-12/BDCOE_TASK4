@@ -232,3 +232,5 @@ Source Content:
 @app.get("/")
 def root():
     return {"status": "running", "service": "StudyForge Backend"}
+    #this is the final line
+    
