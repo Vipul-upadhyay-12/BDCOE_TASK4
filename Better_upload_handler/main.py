@@ -25,7 +25,7 @@ api_key = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=api_key)
 
 # The single chosen lightweight, high-speed model
-TARGET_LLM_MODEL = "qwen3.8-27b"
+TARGET_LLM_MODEL = "openai/gpt-oss-120b"
 
 
 def transcribe_audio_payload(audio_bytes: bytes, filename: str) -> str:
@@ -198,7 +198,7 @@ SOURCE MATERIAL:
             ],
             response_format={"type": "json_object"},
             temperature=0.1,  # Keeps 8B strictly adhered to schema and count
-            max_tokens=4096,  # Fully allows comprehensive notes + 20-30 quiz items
+            max_tokens=8192,  # Fully allows comprehensive notes + 20-30 quiz items
         )
 
         raw_output = completion.choices[0].message.content.strip()
