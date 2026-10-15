@@ -24,8 +24,11 @@ class LocalPipelineApiService {
     bool hasPayload = false;
 
     // 1. Attach on-screen visual/OCR text (PDFs, plain text, or sampled video frames)
-    if (result.extractedText != null && result.extractedText!.trim().isNotEmpty) {
-      request.fields['text'] = result.extractedText!.trim();
+    // 1. Attach extracted .txt file (PDFs, plain text, or sampled video frames)
+    if (result.textFile != null && await result.textFile!.exists()) {
+      request.files.add(
+        await http.MultipartFile.fromPath('text_file', result.textFile!.path),
+      );
       hasPayload = true;
     }
 
