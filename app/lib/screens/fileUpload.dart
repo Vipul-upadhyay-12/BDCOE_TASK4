@@ -121,7 +121,7 @@ class FileUpload extends StatelessWidget {
               const SizedBox(height: 28),
 
               const Text(
-                'Video, Audio and Text files supported\nspecific: mp4, mp3, txt, pdf\nMax. Size: 25 MB',
+                'Video, Audio and PDF files supported\nspecific: mp4, mp3, txt, pdf\nMax. Size: 160 MB (Video) | 25 MB (Audio)',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Color(0xffffcce9),

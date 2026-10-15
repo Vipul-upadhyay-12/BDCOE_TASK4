@@ -25,23 +25,27 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
   @override
   void initState() {
     super.initState();
-    // Inject the controller and initialize it with the file passed from the previous screen
+    // Inject controller and pass the file
     controller = Get.put(OptimizedQuizController());
     controller.setFile(widget.file);
   }
 
   void _onGenerateTapped() {
-    // Sync UI selection state to the controller before triggering
+    // Sync selections to GetX controller
     controller.numQuestions.value = numQuestions;
     controller.difficulty.value = difficulty;
     controller.customPrompt.value = customPromptController.text.trim();
 
-    // Start on-device extraction -> backend AI generation
+    // Trigger local extraction + backend generation pipeline
     controller.startGenerationPipeline();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Calculate safe image width (accounting for 48px total horizontal padding)
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double imageWidth = (screenWidth - 48) * 0.48;
+
     return Scaffold(
       backgroundColor: const Color(0xff181818),
       body: SafeArea(
@@ -70,6 +74,7 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                       letterSpacing: 0.5,
                     ),
                   ),
+                  const SizedBox(width: 24), // Balance spacing
                 ],
               ),
               const SizedBox(height: 16),
@@ -79,6 +84,7 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Title Section
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -92,16 +98,36 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                       ),
                       const SizedBox(height: 6),
                       Container(
-                        width: 130,
-                        height: 2,
+                        width: 110,
+                        height: 2.5,
                         color: const Color(0xff9b7d8e),
                       ),
                     ],
                   ),
-                  Image.asset(
-                    'assets/card.png',
-                    height: 85,
-                    fit: BoxFit.contain,
+
+                  // Responsive, Non-Crashing Half-Screen Image
+                  SizedBox(
+                    width: imageWidth,
+                    height: imageWidth * 0.85, // Proportional height box
+                    child: Image.asset(
+                      'assets/quiz_config.png',
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                      isAntiAlias: true,
+                      // Fallback prevents "can't display" red screen on any device
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xff222222),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0x33ffffff)),
+                          ),
+                          child: const Center(
+                            child: Icon(Icons.quiz_outlined, color: Color(0xffffd000), size: 36),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -172,6 +198,8 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xffffd000),
+                    foregroundColor: Colors.black,
+                    elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -180,7 +208,6 @@ class _QuizConfigScreenState extends State<QuizConfigScreen> {
                   child: const Text(
                     'Generate Quiz',
                     style: TextStyle(
-                      color: Colors.black,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),

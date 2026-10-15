@@ -176,7 +176,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             );
                           },
                           child: GestureDetector(
-                            onTap: () => Get.to(() => const transferUrl()),
+                            onTap: () {
+                              Get.snackbar(
+                                'Coming Soon',
+                                'Feature in development. Stay tuned!',
+                                snackPosition: SnackPosition.BOTTOM,
+                                backgroundColor: const Color(0xff242424),
+                                colorText: const Color(0xffffcce9),
+                                icon: const Icon(Icons.construction_rounded, color: Color(0xffffd000)),
+                                borderColor: const Color(0xffffd000),
+                                borderWidth: 1.2,
+                                margin: const EdgeInsets.all(16),
+                                duration: const Duration(seconds: 2),
+                              );
+                            },
                             child: Container(
                               width: cardWidth,
                               height: cardHeight,
@@ -384,7 +397,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Video, Audio and Text files supported\nspecific: mp4, mp3, txt, pdf\nMax. Size: 160 MB (Video) | 25 MB (Audio/Doc)',
+                'Video, Audio and PDF files supported\nspecific: mp4, mp3, txt, pdf\nMax. Size: 160 MB (Video) | 25 MB (Audio)',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Color(0xffffcce9),
