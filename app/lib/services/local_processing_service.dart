@@ -1,9 +1,8 @@
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:pdfx/pdfx.dart';
-import 'package:get_thumbnail_video/video_thumbnail.dart';
-import 'package:get_thumbnail_video/index.dart';
 
 class LocalProcessingResult {
   final File? textFile;
@@ -18,24 +17,30 @@ class LocalProcessingResult {
 }
 
 class LocalProcessingService {
+  static const MethodChannel _nativeChannel = MethodChannel("com.toolforge.media/pipeline");
   final _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
 
-  // --- ARTIFACT CLEANER & SANITIZER ---
-  // Fixes \f, /f, broken ligatures, OCR noise, and hyphenated split words
+  // Non-destructive cleaner: cleans non-printable control codes while strictly preserving
+  // mathematical exponents (2^2), subscripts (x_1), operators (+, -, *, /), Markdown, and code
   String _sanitizeOcrText(String rawText) {
     return rawText
-        // Strip control characters (including Form Feed \x0C / \f)
         .replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]'), ' ')
-        // Remove literal escaped form feed variations like \f or /f
-        .replaceAll(RegExp(r'(\\|/)f\b'), ' ')
-        // Fix split words across line breaks: "infor- \n mation" -> "information"
-        .replaceAllMapped(RegExp(r'(\w+)-\s*\n\s*(\w+)'), (m) => '${m[1]}${m[2]}')
-        // Eliminate repeated OCR junk symbols (e.g. /**-, ***, ----)
-        .replaceAll(RegExp(r'[\/\\*_-]{3,}'), ' ')
-        // Normalize spacing and consecutive empty lines
-        .replaceAll(RegExp(r'[ \t]+'), ' ')
-        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .replaceAll(RegExp(r'(?:\\|/)f(?![a-zA-Z0-9])'), ' ')
+        .replaceAllMapped(RegExp(r'([a-zA-Z]{2,})-\s*\n\s*([a-zA-Z]{2,})'), (m) => '${m[1]}${m[2]}')
+        .replaceAll(RegExp(r'[ \t]{3,}'), ' ')
+        .replaceAll(RegExp(r'\n{4,}'), '\n\n')
         .trim();
+  }
+
+  // Jaccard word-set similarity ratio (0.0 to 1.0) to filter redundant/unchanged slides
+  double _similarity(String s1, String s2) {
+    if (s1 == s2) return 1.0;
+    if (s1.isEmpty || s2.isEmpty) return 0.0;
+    final words1 = s1.toLowerCase().split(RegExp(r'\s+')).toSet();
+    final words2 = s2.toLowerCase().split(RegExp(r'\s+')).toSet();
+    final intersection = words1.intersection(words2).length;
+    final union = words1.union(words2).length;
+    return union == 0 ? 0.0 : intersection / union;
   }
 
   Future<LocalProcessingResult> processFile(File file) async {
@@ -52,7 +57,7 @@ class LocalProcessingService {
       return LocalProcessingResult(textFile: file, fileType: 'text');
     }
 
-    // 3. Audio Only -> Upload directly for Whisper
+    // 3. Audio Only -> Upload directly for backend Whisper
     else if (path.endsWith('.mp3') ||
         path.endsWith('.wav') ||
         path.endsWith('.m4a') ||
@@ -60,7 +65,7 @@ class LocalProcessingService {
       return LocalProcessingResult(processedAudio: file, fileType: 'audio');
     }
 
-    // 4. Video Files -> Sample Slides to .txt + Pass Media File for Whisper
+    // 4. Video Files -> Native 480p Keyframes + Fast Demuxed .m4a Audio
     else if (path.endsWith('.mp4') ||
         path.endsWith('.mkv') ||
         path.endsWith('.mov') ||
@@ -97,7 +102,6 @@ class LocalProcessingService {
     if (totalPages > 10) {
       const int targetBodySamples = 40;
       final int remainingPages = totalPages - 10;
-      // Calculate dynamic step so processing stays fast regardless of book size
       final int step = (remainingPages / targetBodySamples).ceil().clamp(1, 8);
 
       print(">>> Sampling body pages from 11 to $totalPages with step $step...");
@@ -114,7 +118,6 @@ class LocalProcessingService {
 
     await document.close();
 
-    // Assemble structured text file
     final StringBuffer fullDocument = StringBuffer();
     fullDocument.writeln("=== SECTION 1: TABLE OF CONTENTS & SYLLABUS INDEX (PAGES 1-10) ===");
     fullDocument.writeln(indexBuffer.toString().trim());
@@ -129,10 +132,8 @@ class LocalProcessingService {
     return outputFile;
   }
 
-  // Renders a page, runs ML Kit, sanitizes output, and deletes the image
   Future<String> _extractPageText(PdfDocument document, int pageNum, Directory tempDir) async {
     final page = await document.getPage(pageNum);
-    // Render at 1.5x scale for sharp text legibility
     final pageImage = await page.render(
       width: page.width * 1.5,
       height: page.height * 1.5,
@@ -156,61 +157,97 @@ class LocalProcessingService {
     return cleanText;
   }
 
-  // --- VIDEO DUAL-PROCESSING ---
+  // --- VIDEO DUAL-PROCESSING (480P KEYFRAMES + DEMUXED AUDIO) ---
   Future<LocalProcessingResult> _processVideo(File videoFile) async {
     final tempDir = await getTemporaryDirectory();
-    final StringBuffer slideBuffer = StringBuffer();
-    final Set<String> seenSlides = {};
+    final String videoPath = videoFile.path;
 
-    // Sample a frame every 15s for up to 30 keypoints
-    const int sampleIntervalMs = 15000;
-    const int maxFrames = 30;
+    // 1. Demux audio track natively to .m4a (<500ms)
+    print(">>> Native demuxing audio from video...");
+    final String audioPath = await _nativeChannel.invokeMethod('extractAudioTrack', {'videoPath': videoPath});
+    final File demuxedAudio = File(audioPath);
+    print(">>> Demuxed audio size: ${demuxedAudio.lengthSync() / (1024 * 1024)} MB");
 
-    for (int i = 0; i < maxFrames; i++) {
-      final int timeMs = i * sampleIntervalMs;
+    // 2. Query total duration
+    final int durationMs = (await _nativeChannel.invokeMethod<int>('getVideoDuration', {'videoPath': videoPath})) ?? 0;
+    print(">>> Total video duration: ${durationMs ~/ 1000} seconds");
 
-      try {
-        final thumbFile = await VideoThumbnail.thumbnailFile(
-          video: videoFile.path,
-          thumbnailPath: tempDir.path,
-          imageFormat: ImageFormat.JPEG,
-          timeMs: timeMs,
-          quality: 65,
-        );
+    // 3. Adaptive Sampling Schedule:
+    // First 2 mins: every 20 seconds (6 frames)
+    // Remaining time: dynamically stepped across 70 frames max (capped strictly under 76 total)
+    final List<int> introTimestamps = [];
+    final List<int> bodyTimestamps = [];
 
-        if (thumbFile.path.isNotEmpty) {
-          final imgFile = File(thumbFile.path);
-          if (await imgFile.exists()) {
-            final inputImage = InputImage.fromFile(imgFile);
-            final recognized = await _textRecognizer.processImage(inputImage);
-            final cleanText = _sanitizeOcrText(recognized.text);
+    final int introEndMs = durationMs < 120000 ? durationMs : 120000;
+    for (int t = 10000; t <= introEndMs; t += 20000) {
+      introTimestamps.add(t);
+    }
 
-            if (cleanText.length > 20 && !seenSlides.contains(cleanText)) {
-              seenSlides.add(cleanText);
-              slideBuffer.writeln("[Slide @ ${timeMs ~/ 1000}s]:");
-              slideBuffer.writeln(cleanText);
-              slideBuffer.writeln();
-            }
+    if (durationMs > 120000) {
+      const int targetBodyBudget = 70;
+      final int remainingMs = durationMs - 120000;
+      final int stepMs = (remainingMs ~/ targetBodyBudget).clamp(60000, 300000);
 
-            await imgFile.delete();
-          }
-        }
-      } catch (e) {
-        break; // Stop if timestamp exceeds video length
+      for (int t = 120000 + stepMs; t < durationMs; t += stepMs) {
+        bodyTimestamps.add(t);
       }
     }
 
-    // Save slides to .txt file
-    File? slideTxtFile;
-    if (slideBuffer.isNotEmpty) {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      slideTxtFile = File('${tempDir.path}/video_slides_$timestamp.txt');
-      await slideTxtFile.writeAsString(slideBuffer.toString().trim());
+    final allTimestamps = [...introTimestamps, ...bodyTimestamps];
+    print(">>> Requesting ${allTimestamps.length} native keyframes at 480p...");
+
+    // 4. Batch native 480p extraction (OPTION_CLOSEST_SYNC)
+    final List<dynamic> rawPaths = await _nativeChannel.invokeMethod('extractKeyframes', {
+      'videoPath': videoPath,
+      'timestampsMs': allTimestamps,
+      'targetWidth': 854,
+      'targetHeight': 480,
+    });
+    final List<String> framePaths = rawPaths.cast<String>();
+
+    // 5. OCR & Similarity De-duplication
+    final StringBuffer introBuffer = StringBuffer();
+    final StringBuffer bodyBuffer = StringBuffer();
+    String previousSlideText = "";
+
+    for (int i = 0; i < framePaths.length; i++) {
+      final imgFile = File(framePaths[i]);
+      if (await imgFile.exists()) {
+        final inputImage = InputImage.fromFile(imgFile);
+        final recognized = await _textRecognizer.processImage(inputImage);
+        final cleanText = _sanitizeOcrText(recognized.text);
+
+        await imgFile.delete(); // Delete keyframe immediately to prevent storage buildup
+
+        if (cleanText.length > 25 && _similarity(previousSlideText, cleanText) < 0.75) {
+          previousSlideText = cleanText;
+          final int timeSec = allTimestamps[i] ~/ 1000;
+
+          if (i < introTimestamps.length) {
+            introBuffer.writeln("[Agenda/Intro Slide @ ${timeSec}s]:\n$cleanText\n");
+          } else {
+            bodyBuffer.writeln("[Content Slide @ ${timeSec}s]:\n$cleanText\n");
+          }
+        }
+      }
     }
 
+    // 6. Assemble into Structured Text File
+    final StringBuffer fullText = StringBuffer();
+    fullText.writeln("=== SECTION 1: LECTURE OVERVIEW & AGENDA SLIDES (FIRST 2 MINS) ===");
+    fullText.writeln(introBuffer.toString().trim());
+    fullText.writeln("\n\n=== SECTION 2: SAMPLED SLIDES & EQUATIONS (BODY CONTENT) ===");
+    fullText.writeln(bodyBuffer.toString().trim());
+
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final textFile = File('${tempDir.path}/video_slides_$timestamp.txt');
+    await textFile.writeAsString(fullText.toString());
+
+    print(">>> Video OCR complete. Saved ${textFile.lengthSync()} bytes of slide text.");
+
     return LocalProcessingResult(
-      textFile: slideTxtFile,
-      processedAudio: videoFile, // Whisper handles the audio stream
+      textFile: textFile,
+      processedAudio: demuxedAudio,
       fileType: 'video_composite',
     );
   }

@@ -2,102 +2,116 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
-import '../services/api_service.dart';
 import '../screens/quiz_config_screen.dart';
 
 class FileProcessingController extends GetxController {
-  var selectedFile = Rxn<File>();
-  var fileName = 'No file selected'.obs;
-  var isLoading = false.obs;
+  // Observables
+  final RxString fileName = "Tap to choose a file".obs;
+  final RxBool isProcessing = false.obs;
 
-  // Pick file from device storage
+  // Stored File reference
+  File? selectedFile;
+
   Future<void> pickFile() async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'txt', 'mp3', 'mp4'],
+        allowedExtensions: [
+          'pdf', 'txt', 'mp3', 'wav', 'm4a', 'aac', 'mp4', 'mkv', 'mov', 'webm'
+        ],
       );
 
-      if (result != null && result.files.isNotEmpty) {
-        final platformFile = result.files.single;
-        debugPrint('File selected: ${platformFile.name}');
-        debugPrint('File path: ${platformFile.path}');
-
-        if (platformFile.path != null) {
-          selectedFile.value = File(platformFile.path!);
-        }
-        // Update the observable string
-        fileName.value = platformFile.name;
-      } else {
-        debugPrint('User canceled file picker');
+      if (result == null || result.files.isEmpty) {
+        return;
       }
+
+      final fileData = result.files.first;
+      final rawPath = fileData.path;
+
+      if (rawPath == null) {
+        Get.snackbar(
+          "Error",
+          "Could not retrieve file path. Please try selecting the file again.",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xff242424),
+          colorText: Colors.redAccent,
+        );
+        return;
+      }
+
+      final picked = File(rawPath);
+      if (!await picked.exists()) {
+        Get.snackbar(
+          "Error",
+          "File does not exist or cannot be accessed.",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xff242424),
+          colorText: Colors.redAccent,
+        );
+        return;
+      }
+
+      // Robust extension extraction (handles Android null extension bug)
+      String extension = (fileData.extension ?? '').toLowerCase();
+      if (extension.isEmpty && rawPath.contains('.')) {
+        extension = rawPath.split('.').last.toLowerCase();
+      }
+      if (extension.isEmpty && fileData.name.contains('.')) {
+        extension = fileData.name.split('.').last.toLowerCase();
+      }
+
+      final isVideo = ['mp4', 'mkv', 'mov', 'webm'].contains(extension);
+      final double maxAllowedMb = isVideo ? 160.0 : 25.0;
+
+      final int fileSizeBytes = await picked.length();
+      final double fileSizeMb = fileSizeBytes / (1024 * 1024);
+
+      if (fileSizeMb > maxAllowedMb) {
+        selectedFile = null;
+        fileName.value = "Tap to choose a file";
+
+        Get.snackbar(
+          "File Too Large",
+          isVideo
+              ? "Video is ${fileSizeMb.toStringAsFixed(1)} MB. Max limit for video is 160 MB."
+              : "File is ${fileSizeMb.toStringAsFixed(1)} MB. Max limit is 25 MB.",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xff242424),
+          colorText: const Color(0xffffd000),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 4),
+        );
+        return;
+      }
+
+      // Store verified file and update UI label
+      selectedFile = picked;
+      fileName.value = fileData.name;
     } catch (e) {
-      debugPrint('Error picking file: $e');
+      Get.snackbar(
+        "Error",
+        "Failed to pick file: $e",
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xff242424),
+        colorText: Colors.redAccent,
+      );
     }
   }
-  // Handle Quiz Card Tap -> Goes to Configuration Screen
+
   void onQuizTapped() {
-    if (selectedFile.value == null) {
+    if (selectedFile == null || !selectedFile!.existsSync()) {
       Get.snackbar(
-        'File Required',
-        'Please select a file first by tapping the file box.',
-        backgroundColor: Colors.amber,
-        colorText: Colors.black,
+        "No File Selected",
+        "Please select a file first.",
         snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xff242424),
+        colorText: const Color(0xffffd000),
+        margin: const EdgeInsets.all(16),
       );
       return;
     }
 
-    Get.to(() => QuizConfigScreen(file: selectedFile.value!));
-  }
-
-  // Trigger processing for Notes or Summaries
-  Future<void> generateContent(String taskType) async {
-    if (selectedFile.value == null) {
-      Get.snackbar(
-        'File Required',
-        'Please select a file first by tapping the file box.',
-        backgroundColor: Colors.amber,
-        colorText: Colors.black,
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
-
-    try {
-      isLoading.value = true;
-      Get.dialog(
-        const Center(
-          child: CircularProgressIndicator(color: Color(0xffffd000)),
-        ),
-        barrierDismissible: false,
-      );
-
-      final data = await ApiService.processFile(
-        file: selectedFile.value!,
-        taskType: taskType,
-      );
-
-      Get.back();
-
-      Get.snackbar(
-        'Notes Ready',
-        'Notes generated successfully',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-      );
-    } catch (e) {
-      Get.back();
-      Get.snackbar(
-        'Generation Failed',
-        e.toString(),
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-      );
-    } finally {
-      isLoading.value = false;
-    }
+    print(">>> Proceeding with file: ${selectedFile!.path}");
+    Get.to(() => QuizConfigScreen(file: selectedFile!));
   }
 }

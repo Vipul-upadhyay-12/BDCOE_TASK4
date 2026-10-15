@@ -48,7 +48,7 @@ class AppPages {
     ),
     GetPage(
       name: Routes.FILE_UPLOAD,
-      page: () => fileUpload(),
+      page: () => FileUpload(),
     ),
     GetPage(
       name: Routes.TRANSFER_URL,

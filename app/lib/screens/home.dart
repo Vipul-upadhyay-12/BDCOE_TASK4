@@ -231,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             );
                           },
                           child: GestureDetector(
-                            onTap: () => Get.to(() => fileUpload()),
+                            onTap: () => Get.to(() => FileUpload()),
                             child: Container(
                               width: cardWidth,
                               height: cardHeight,
