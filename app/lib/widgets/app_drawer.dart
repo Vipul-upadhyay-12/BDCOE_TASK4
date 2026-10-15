@@ -1,5 +1,6 @@
 import 'package:app/routes/app_pages.dart';
 import 'package:app/screens/login_Screen.dart';
+import 'package:app/screens/profile_screen.dart';
 import 'package:app/services/storage_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -54,7 +55,10 @@ class AppDrawer extends StatelessWidget {
               _drawerItem(
                 label: 'Profile',
                 color: Colors.white,
-                onTap: () => Get.back(),
+                onTap: (){
+                  Get.back();
+                  Get.to(() => ProfileScreen());
+                }
               ),
               const SizedBox(height: 20),
 

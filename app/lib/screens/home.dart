@@ -2,6 +2,7 @@ import 'package:app/widgets/app_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'fileUpload.dart';
 import 'transferUrl.dart';
 
@@ -15,6 +16,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late AnimationController _leftController;
   late AnimationController _rightController;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -38,17 +40,41 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  // Resolves the correct name across Firestore, Google Auth, and Email logins
+  Future<String> _resolveUserName() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return 'Friend';
+
+    // 1. Google Auth or updated display name
+    if (user.displayName != null && user.displayName!.trim().isNotEmpty) {
+      return user.displayName!.trim().split(' ').first;
+    }
+
+    // 2. Cloud Firestore saved profile record
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && doc.data() != null) {
+        final storedName = doc.data()!['name']?.toString().trim();
+        if (storedName != null && storedName.isNotEmpty) {
+          return storedName.split(' ').first;
+        }
+      }
+    } catch (_) {}
+
+    // 3. Fallback: Parse prefix of email (e.g. "alex" from alex@domain.com)
+    if (user.email != null && user.email!.contains('@')) {
+      final prefix = user.email!.split('@').first;
+      return prefix[0].toUpperCase() + prefix.substring(1);
+    }
+
+    return 'Friend';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final userName = user?.displayName?.split(' ').first ?? 'Friend';
-
     return Scaffold(
-      key: _scaffoldKey, // 2. Attach key here
+      key: _scaffoldKey,
       drawer: const AppDrawer(),
-      
       backgroundColor: const Color(0xff181818),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -80,19 +106,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
               const SizedBox(height: 24),
 
-              // Dynamic Greeting
+              // Dynamic Greeting with Firestore/Auth fallback
               Align(
                 alignment: Alignment.centerLeft,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Hey $userName,',
-                      style: const TextStyle(
-                        color: Color(0xffffcce9),
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    FutureBuilder<String>(
+                      future: _resolveUserName(),
+                      builder: (context, snapshot) {
+                        final name = snapshot.data ?? 'Friend';
+                        return Text(
+                          'Hey $name,',
+                          style: const TextStyle(
+                            color: Color(0xffffcce9),
+                            fontSize: 30,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 6),
                     Container(
@@ -328,8 +360,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Video, Audio and Text files supported\nspecific- mp4, mp3, txt, pdf\nMax. Size: 28 Mb',
-                textAlign: TextAlign.left,
+                'Video, Audio and Text files supported\nspecific: mp4, mp3, txt, pdf\nMax. Size: 160 MB (Video) | 25 MB (Audio/Doc)',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Color(0xffffcce9),
                   fontSize: 14,
