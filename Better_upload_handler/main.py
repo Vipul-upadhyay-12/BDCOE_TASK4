@@ -25,7 +25,7 @@ api_key = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=api_key)
 
 # The single chosen lightweight, high-speed model
-TARGET_LLM_MODEL = "allam-2-7b"
+TARGET_LLM_MODEL = "qwen3.8-27b"
 
 
 def transcribe_audio_payload(audio_bytes: bytes, filename: str) -> str:
