@@ -164,7 +164,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Left Card: Transfer a URL
+                        // -------------------------------------------------------------
+                        // Left Card: Transfer a URL (Image pushed UP)
+                        // -------------------------------------------------------------
                         AnimatedBuilder(
                           animation: _leftController,
                           builder: (context, child) {
@@ -186,15 +188,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(13.5),
                                 child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
+                                    // Top Image Box with negative Y-offset
                                     SizedBox(
                                       height: cardHeight * 0.52,
                                       width: double.infinity,
-                                      child: Image.asset(
-                                        'assets/card2.png',
-                                        fit: BoxFit.cover,
+                                      child: ClipRect(
+                                        child: Transform.translate(
+                                          offset: const Offset(0, -12), // Pushes image UP past the edge
+                                          child: Image.asset(
+                                            'assets/card2.png',
+                                            fit: BoxFit.cover,
+                                            width: double.infinity,
+                                            height: (cardHeight * 0.52) + 16,
+                                          ),
+                                        ),
                                       ),
                                     ),
+                                    // Bottom Content
                                     Expanded(
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -253,7 +265,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                         ),
 
-                        // Right Card: File Upload
+                        // -------------------------------------------------------------
+                        // Right Card: File Upload (Image pushed DOWN)
+                        // -------------------------------------------------------------
                         AnimatedBuilder(
                           animation: _rightController,
                           builder: (context, child) {
@@ -275,7 +289,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(13.5),
                                 child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
+                                    // Top Content
                                     Expanded(
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -327,12 +343,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                         ),
                                       ),
                                     ),
+                                    // Bottom Image Box with positive Y-offset
                                     SizedBox(
                                       height: cardHeight * 0.52,
                                       width: double.infinity,
-                                      child: Image.asset(
-                                        'assets/card.png',
-                                        fit: BoxFit.cover,
+                                      child: ClipRect(
+                                        child: Transform.translate(
+                                          offset: const Offset(0, 12), // Pushes image DOWN past the edge
+                                          child: Image.asset(
+                                            'assets/card.png',
+                                            fit: BoxFit.cover,
+                                            width: double.infinity,
+                                            height: (cardHeight * 0.52) + 16,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ],

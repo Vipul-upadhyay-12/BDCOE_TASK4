@@ -1,4 +1,5 @@
 import 'package:app/routes/app_pages.dart';
+import 'package:app/screens/contact_screen.dart';
 import 'package:app/screens/login_Screen.dart';
 import 'package:app/screens/profile_screen.dart';
 import 'package:app/services/storage_service.dart';
@@ -65,14 +66,20 @@ class AppDrawer extends StatelessWidget {
               _drawerItem(
                 label: 'Settings',
                 color: Colors.white,
-                onTap: () => Get.back(),
+                onTap: (){
+                  Get.back();
+                  Get.to(() => ProfileScreen());
+                }
               ),
               const SizedBox(height: 20),
 
               _drawerItem(
                 label: 'Contact us',
                 color: Colors.white,
-                onTap: () => Get.back(),
+                onTap: () {
+                  Get.back();
+                  Get.to(() => const ContactUsScreen());
+                },
               ),
 
               const Spacer(),
